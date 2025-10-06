@@ -1,43 +1,84 @@
 import * as THREE from "three";
+import { BlockType } from "./blocks";
 
 export interface RaycastHit {
   position: THREE.Vector3;
   normal: THREE.Vector3;
   distance: number;
+  blockType: BlockType;
 }
 
 export function performRaycast(
   origin: THREE.Vector3,
   direction: THREE.Vector3,
-  maxDistance: number
+  maxDistance: number,
+  getBlock: (x: number, y: number, z: number) => BlockType
 ): RaycastHit | null {
-  const raycaster = new THREE.Raycaster(origin, direction.normalize(), 0, maxDistance);
+  const dir = direction.clone().normalize();
   
-  // Simple grid-based raycast for voxel world
-  const step = 0.1;
-  let currentDistance = 0;
-  const currentPos = origin.clone();
-  const stepVector = direction.clone().multiplyScalar(step);
+  let x = Math.floor(origin.x);
+  let y = Math.floor(origin.y);
+  let z = Math.floor(origin.z);
   
-  while (currentDistance < maxDistance) {
-    currentPos.add(stepVector);
-    currentDistance += step;
+  const stepX = Math.sign(dir.x);
+  const stepY = Math.sign(dir.y);
+  const stepZ = Math.sign(dir.z);
+  
+  const tDeltaX = stepX !== 0 ? Math.abs(1 / dir.x) : Infinity;
+  const tDeltaY = stepY !== 0 ? Math.abs(1 / dir.y) : Infinity;
+  const tDeltaZ = stepZ !== 0 ? Math.abs(1 / dir.z) : Infinity;
+  
+  const xDist = stepX > 0 ? (x + 1 - origin.x) : (origin.x - x);
+  const yDist = stepY > 0 ? (y + 1 - origin.y) : (origin.y - y);
+  const zDist = stepZ > 0 ? (z + 1 - origin.z) : (origin.z - z);
+  
+  let tMaxX = tDeltaX * xDist;
+  let tMaxY = tDeltaY * yDist;
+  let tMaxZ = tDeltaZ * zDist;
+  
+  let hitNormal = new THREE.Vector3(0, 0, 0);
+  let distance = 0;
+  
+  while (distance < maxDistance) {
+    const blockType = getBlock(x, y, z);
     
-    // Check if we hit a solid block (simplified)
-    const blockX = Math.floor(currentPos.x);
-    const blockY = Math.floor(currentPos.y);
-    const blockZ = Math.floor(currentPos.z);
-    
-    // Simple terrain check - blocks exist at y=64 level
-    if (blockY <= 64 && blockY >= 60) {
-      const hitPosition = new THREE.Vector3(blockX, blockY, blockZ);
-      const normal = new THREE.Vector3(0, 1, 0); // Always up normal for now
-      
+    if (blockType !== BlockType.AIR && blockType !== undefined) {
       return {
-        position: hitPosition,
-        normal: normal,
-        distance: currentDistance,
+        position: new THREE.Vector3(x, y, z),
+        normal: hitNormal.clone(),
+        distance,
+        blockType,
       };
+    }
+    
+    if (tMaxX < tMaxY) {
+      if (tMaxX < tMaxZ) {
+        x += stepX;
+        distance = tMaxX;
+        tMaxX += tDeltaX;
+        hitNormal.set(-stepX, 0, 0);
+      } else {
+        z += stepZ;
+        distance = tMaxZ;
+        tMaxZ += tDeltaZ;
+        hitNormal.set(0, 0, -stepZ);
+      }
+    } else {
+      if (tMaxY < tMaxZ) {
+        y += stepY;
+        distance = tMaxY;
+        tMaxY += tDeltaY;
+        hitNormal.set(0, -stepY, 0);
+      } else {
+        z += stepZ;
+        distance = tMaxZ;
+        tMaxZ += tDeltaZ;
+        hitNormal.set(0, 0, -stepZ);
+      }
+    }
+    
+    if (Math.abs(x) > 1000 || Math.abs(y) > 1000 || Math.abs(z) > 1000) {
+      break;
     }
   }
   
