@@ -4,6 +4,7 @@ import { KeyboardControls } from "@react-three/drei";
 import { useGame } from "./lib/stores/useGame";
 import World from "./engine/World";
 import Player from "./engine/Player";
+import DayNightCycle from "./engine/DayNightCycle";
 import GameHUD from "./ui/GameHUD";
 import Inventory from "./ui/Inventory";
 import Crafting from "./ui/Crafting";
@@ -95,24 +96,8 @@ function App() {
               powerPreference: "high-performance"
             }}
           >
-            <color attach="background" args={["#87CEEB"]} />
-            
-            {/* Lighting */}
-            <ambientLight intensity={0.3} />
-            <directionalLight
-              position={[100, 100, 50]}
-              intensity={1}
-              castShadow
-              shadow-mapSize-width={2048}
-              shadow-mapSize-height={2048}
-              shadow-camera-far={200}
-              shadow-camera-left={-50}
-              shadow-camera-right={50}
-              shadow-camera-top={50}
-              shadow-camera-bottom={-50}
-            />
-
             <Suspense fallback={null}>
+              <DayNightCycle />
               <World />
               <Player />
             </Suspense>
