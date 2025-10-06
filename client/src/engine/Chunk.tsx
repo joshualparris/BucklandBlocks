@@ -1,24 +1,26 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { useTexture } from '@react-three/drei';
-import { BlockType } from './blocks';
 import { createBlockMesh } from './mesher';
-import { generateChunkTerrain } from '../utils/noise';
+import { useGame } from '../lib/stores/useGame';
 
 export interface ChunkProps {
+  chunkX: number;
+  chunkZ: number;
   position: [number, number, number];
   size: { x: number; y: number; z: number };
-  voxelData?: Uint8Array;
 }
 
-const Chunk: React.FC<ChunkProps> = ({ position, size, voxelData: providedVoxelData }) => {
+const Chunk: React.FC<ChunkProps> = ({ chunkX, chunkZ, position, size }) => {
   const grassTexture = useTexture('/textures/grass.png');
   const asphaltTexture = useTexture('/textures/asphalt.png');
   const woodTexture = useTexture('/textures/wood.jpg');
   const sandTexture = useTexture('/textures/sand.jpg');
   const skyTexture = useTexture('/textures/sky.png');
 
-  // Configure textures
+  const { getChunk } = useGame();
+  const voxelData = getChunk(chunkX, chunkZ);
+
   [grassTexture, asphaltTexture, woodTexture, sandTexture, skyTexture].forEach(texture => {
     texture.magFilter = THREE.NearestFilter;
     texture.minFilter = THREE.NearestFilter;
@@ -27,18 +29,12 @@ const Chunk: React.FC<ChunkProps> = ({ position, size, voxelData: providedVoxelD
   });
 
   const { geometry, materials } = useMemo(() => {
-    const voxelData = providedVoxelData || generateChunkTerrain(
-      position[0],
-      position[1], 
-      position[2],
-      size.x,
-      size.y,
-      size.z
-    );
+    if (!voxelData) {
+      return { geometry: new THREE.BufferGeometry(), materials: [] };
+    }
 
     const geo = createBlockMesh(voxelData, size);
     
-    // Create materials for different block types
     const mats = [
       new THREE.MeshLambertMaterial({ map: grassTexture, transparent: false }),
       new THREE.MeshLambertMaterial({ map: asphaltTexture, transparent: false }),
@@ -48,17 +44,17 @@ const Chunk: React.FC<ChunkProps> = ({ position, size, voxelData: providedVoxelD
     ];
 
     return { geometry: geo, materials: mats };
-  }, [position, size, providedVoxelData, grassTexture, asphaltTexture, woodTexture, sandTexture, skyTexture]);
+  }, [voxelData, size, grassTexture, asphaltTexture, woodTexture, sandTexture, skyTexture]);
 
   if (!geometry.attributes.position) {
-    return null; // Empty chunk
+    return null;
   }
 
   return (
     <mesh
       position={position}
       geometry={geometry}
-      material={materials[0]} // Use grass material as default
+      material={materials[0]}
       castShadow
       receiveShadow
     />
