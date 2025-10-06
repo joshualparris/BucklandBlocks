@@ -1,43 +1,87 @@
 import React from 'react';
 import { Play, Settings, Save, FolderOpen, Trash2, Home } from 'lucide-react';
-import { hasSave, deleteSave } from '../engine/save';
+import { useGame } from '../lib/stores/useGame';
+import { useThree } from '@react-three/fiber';
 
 interface PauseMenuProps {
   onClose: () => void;
 }
 
 const PauseMenu: React.FC<PauseMenuProps> = ({ onClose }) => {
+  const { camera } = useThree();
+  const {
+    chunks,
+    inventory,
+    inventoryCounts,
+    selectedSlot,
+    gameTime,
+  } = useGame();
+
   const handleResume = () => {
     onClose();
   };
 
   const handleSave = () => {
-    // TODO: Trigger world save
-    console.log('Saving world...');
-    onClose();
+    try {
+      const saveData = {
+        playerPosition: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
+        playerRotation: {
+          x: camera.rotation.x,
+          y: camera.rotation.y,
+        },
+        inventory: [...inventory],
+        inventoryCounts: [...inventoryCounts],
+        selectedSlot,
+        gameTime,
+        chunks: Array.from(chunks.entries()).map(([key, data]) => ({
+          key,
+          voxelData: Array.from(data.voxelData),
+        })),
+        timestamp: Date.now(),
+      };
+      
+      localStorage.setItem('buckland_blocks_save', JSON.stringify(saveData));
+      console.log('World saved successfully!');
+      onClose();
+    } catch (error) {
+      console.error('Failed to save world:', error);
+      alert('Failed to save world');
+    }
   };
 
   const handleLoad = () => {
-    // TODO: Load world from save
-    console.log('Loading world...');
-    onClose();
+    try {
+      const savedData = localStorage.getItem('buckland_blocks_save');
+      if (savedData) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to load world:', error);
+      alert('Failed to load world');
+    }
   };
 
   const handleNewWorld = () => {
     if (window.confirm('This will delete your current world. Are you sure?')) {
-      deleteSave();
+      localStorage.removeItem('buckland_blocks_save');
       window.location.reload();
     }
   };
 
   const handleSettings = () => {
-    // TODO: Open settings menu
     console.log('Opening settings...');
   };
 
   const handleMainMenu = () => {
-    // TODO: Return to main menu
     console.log('Returning to main menu...');
+  };
+
+  const hasSave = () => {
+    return localStorage.getItem('buckland_blocks_save') !== null;
   };
 
   return (

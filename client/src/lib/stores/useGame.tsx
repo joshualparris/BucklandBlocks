@@ -51,22 +51,39 @@ interface GameState {
   updateGameTime: (delta: number) => void;
 }
 
+const initializeInventory = (): [(BlockType | null)[], number[]] => {
+  const inventory = new Array(36).fill(null);
+  const counts = new Array(36).fill(0);
+  
+  inventory[0] = BlockType.WOOD_PLANK;
+  counts[0] = 64;
+  inventory[1] = BlockType.DIRT;
+  counts[1] = 64;
+  inventory[2] = BlockType.COBBLESTONE;
+  counts[2] = 64;
+  
+  return [inventory, counts];
+};
+
 export const useGame = create<GameState>()(
-  subscribeWithSelector((set, get) => ({
-    phase: "ready",
+  subscribeWithSelector((set, get) => {
+    const [initialInventory, initialCounts] = initializeInventory();
     
-    // Initial player state
-    playerPosition: new THREE.Vector3(0, 70, 0),
-    playerRotation: { x: 0, y: 0 },
-    
-    // Initial inventory (9 hotbar + 27 main = 36 total)
-    inventory: new Array(36).fill(null),
-    inventoryCounts: new Array(36).fill(0),
-    selectedSlot: 0,
-    
-    // Initial world state
-    chunks: new Map(),
-    gameTime: 0,
+    return {
+      phase: "ready",
+      
+      // Initial player state
+      playerPosition: new THREE.Vector3(0, 70, 0),
+      playerRotation: { x: 0, y: 0 },
+      
+      // Initial inventory (9 hotbar + 27 main = 36 total)
+      inventory: initialInventory,
+      inventoryCounts: initialCounts,
+      selectedSlot: 0,
+      
+      // Initial world state
+      chunks: new Map(),
+      gameTime: 0,
     
     start: () => {
       set((state) => {
