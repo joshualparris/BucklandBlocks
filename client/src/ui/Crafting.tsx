@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { BlockType, BLOCKS } from '../engine/blocks';
+import { useGame } from '../lib/stores/useGame';
 import recipes from '../data/recipes.json';
 
 interface CraftingProps {
   onClose: () => void;
-  inventory?: (BlockType | null)[];
-  inventoryCounts?: number[];
 }
 
 interface Recipe {
@@ -16,11 +15,8 @@ interface Recipe {
   pattern: string[];
 }
 
-const Crafting: React.FC<CraftingProps> = ({ 
-  onClose,
-  inventory = new Array(36).fill(null),
-  inventoryCounts = new Array(36).fill(0)
-}) => {
+const Crafting: React.FC<CraftingProps> = ({ onClose }) => {
+  const { inventory, inventoryCounts, addToInventory, removeFromInventory } = useGame();
   const [craftingGrid, setCraftingGrid] = useState<(BlockType | null)[]>(new Array(4).fill(null));
   const [craftingCounts, setCraftingCounts] = useState<number[]>(new Array(4).fill(0));
   const [craftResult, setCraftResult] = useState<{ type: BlockType; count: number } | null>(null);
@@ -67,9 +63,10 @@ const Crafting: React.FC<CraftingProps> = ({
 
   const handleCraftButtonClick = () => {
     if (craftResult) {
-      // TODO: Perform crafting - remove ingredients and add result to inventory
       console.log('Crafting:', craftResult);
-      // Clear crafting grid
+      
+      addToInventory(craftResult.type, craftResult.count);
+      
       setCraftingGrid(new Array(4).fill(null));
       setCraftingCounts(new Array(4).fill(0));
     }

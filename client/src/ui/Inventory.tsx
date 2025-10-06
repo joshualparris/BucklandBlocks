@@ -1,18 +1,14 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { BlockType, BLOCKS } from '../engine/blocks';
+import { useGame } from '../lib/stores/useGame';
 
 interface InventoryProps {
   onClose: () => void;
-  inventory?: (BlockType | null)[];
-  inventoryCounts?: number[];
 }
 
-const Inventory: React.FC<InventoryProps> = ({ 
-  onClose,
-  inventory = new Array(36).fill(null),
-  inventoryCounts = new Array(36).fill(0)
-}) => {
+const Inventory: React.FC<InventoryProps> = ({ onClose }) => {
+  const { inventory, inventoryCounts } = useGame();
   const handleSlotClick = (slotIndex: number) => {
     // TODO: Handle slot interactions (move items, split stacks, etc.)
     console.log('Clicked inventory slot:', slotIndex);

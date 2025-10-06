@@ -1,22 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { BlockType, BLOCKS } from '../engine/blocks';
+import { useGame } from '../lib/stores/useGame';
+import { useThree } from '@react-three/fiber';
 
-interface GameHUDProps {
-  selectedSlot?: number;
-  inventory?: (BlockType | null)[];
-  inventoryCounts?: number[];
-}
-
-const GameHUD: React.FC<GameHUDProps> = ({ 
-  selectedSlot = 0, 
-  inventory = new Array(9).fill(BlockType.DIRT),
-  inventoryCounts = new Array(9).fill(64)
-}) => {
+const GameHUD: React.FC = () => {
+  const { selectedSlot, inventory, inventoryCounts, gameTime } = useGame();
+  const { camera } = useThree();
   const [fps, setFps] = useState(60);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 70, z: 0 });
-  const [gameTime, setGameTime] = useState(0);
 
-  // Simple FPS counter
   useEffect(() => {
     let frameCount = 0;
     let lastTime = performance.now();
@@ -37,14 +29,19 @@ const GameHUD: React.FC<GameHUDProps> = ({
     updateFPS();
   }, []);
 
-  // Game time (day/night cycle)
   useEffect(() => {
     const interval = setInterval(() => {
-      setGameTime(time => (time + 1) % 24000); // 20 minute day cycle
-    }, 50);
+      if (camera) {
+        setCoordinates({
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z
+        });
+      }
+    }, 100);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [camera]);
 
   const timeOfDay = Math.floor((gameTime / 1000) % 24);
   const isNight = timeOfDay >= 18 || timeOfDay < 6;
