@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useThree } from '@react-three/fiber';
 import Chunk from './Chunk';
 import { generateChunkTerrain } from '../utils/noise';
 import { fetchOSMData, processOSMData } from '../utils/osm';
@@ -13,6 +14,7 @@ const CHUNK_SIZE = { x: 16, y: 128, z: 16 };
 const STARTING_ADDRESS = "53 Buckland Street, Epsom VIC 3551, Australia";
 
 const World: React.FC<WorldProps> = ({ viewDistance = 4 }) => {
+  const { camera } = useThree();
   const [centerChunk, setCenterChunk] = useState({ x: 0, z: 0 });
   const { setChunk, getChunk } = useGame();
 
@@ -23,10 +25,21 @@ const World: React.FC<WorldProps> = ({ viewDistance = 4 }) => {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Track which chunks we've rendered
   const [renderedChunks, setRenderedChunks] = useState<Set<string>>(new Set());
 
-  // Generate chunks around the center
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const playerChunkX = Math.floor(camera.position.x / CHUNK_SIZE.x);
+      const playerChunkZ = Math.floor(camera.position.z / CHUNK_SIZE.z);
+      
+      if (playerChunkX !== centerChunk.x || playerChunkZ !== centerChunk.z) {
+        setCenterChunk({ x: playerChunkX, z: playerChunkZ });
+      }
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [camera, centerChunk]);
+
   useEffect(() => {
     const newRenderedChunks = new Set<string>();
     

@@ -65,27 +65,52 @@ const initializeInventory = (): [(BlockType | null)[], number[]] => {
   return [inventory, counts];
 };
 
+const loadSavedGame = () => {
+  try {
+    const savedData = localStorage.getItem('buckland_blocks_save');
+    if (savedData) {
+      return JSON.parse(savedData);
+    }
+  } catch (error) {
+    console.error('Failed to load saved game:', error);
+  }
+  return null;
+};
+
 export const useGame = create<GameState>()(
   subscribeWithSelector((set, get) => {
+    const savedGame = loadSavedGame();
     const [initialInventory, initialCounts] = initializeInventory();
+    
+    const initialChunks = new Map();
+    if (savedGame?.chunks) {
+      savedGame.chunks.forEach((chunk: any) => {
+        initialChunks.set(chunk.key, {
+          voxelData: new Uint8Array(chunk.voxelData),
+          dirty: false,
+        });
+      });
+    }
     
     return {
       phase: "ready",
       
       // Initial player state
-      playerPosition: new THREE.Vector3(0, 70, 0),
-      playerRotation: { x: 0, y: 0 },
+      playerPosition: savedGame?.playerPosition 
+        ? new THREE.Vector3(savedGame.playerPosition.x, savedGame.playerPosition.y, savedGame.playerPosition.z)
+        : new THREE.Vector3(0, 70, 0),
+      playerRotation: savedGame?.playerRotation || { x: 0, y: 0 },
       
       // Initial inventory (9 hotbar + 27 main = 36 total)
-      inventory: initialInventory,
-      inventoryCounts: initialCounts,
-      selectedSlot: 0,
+      inventory: savedGame?.inventory || initialInventory,
+      inventoryCounts: savedGame?.inventoryCounts || initialCounts,
+      selectedSlot: savedGame?.selectedSlot || 0,
       
       // Initial world state
-      chunks: new Map(),
-      gameTime: 0,
-    
-    start: () => {
+      chunks: initialChunks,
+      gameTime: savedGame?.gameTime || 0,
+      
+      start: () => {
       set((state) => {
         if (state.phase === "ready") {
           return { phase: "playing" };
@@ -241,5 +266,5 @@ export const useGame = create<GameState>()(
         gameTime: (state.gameTime + delta) % 24000
       }));
     },
-  }))
+  };})
 );

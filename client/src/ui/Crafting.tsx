@@ -16,7 +16,7 @@ interface Recipe {
 }
 
 const Crafting: React.FC<CraftingProps> = ({ onClose }) => {
-  const { inventory, inventoryCounts, addToInventory, removeFromInventory } = useGame();
+  const { inventory, inventoryCounts, selectedSlot, addToInventory, removeFromInventory } = useGame();
   const [craftingGrid, setCraftingGrid] = useState<(BlockType | null)[]>(new Array(4).fill(null));
   const [craftingCounts, setCraftingCounts] = useState<number[]>(new Array(4).fill(0));
   const [craftResult, setCraftResult] = useState<{ type: BlockType; count: number } | null>(null);
@@ -24,8 +24,9 @@ const Crafting: React.FC<CraftingProps> = ({ onClose }) => {
   // Check if a recipe matches the current crafting grid
   const findMatchingRecipe = (): Recipe | null => {
     for (const recipe of recipes as Recipe[]) {
-      if (recipe.pattern.length === 2) { // 2x2 recipe
+      if (recipe.pattern.length === 2) {
         let matches = true;
+        const ingredientCounts = new Map<BlockType, number>();
         
         for (let i = 0; i < 4; i++) {
           const row = Math.floor(i / 2);
@@ -42,6 +43,20 @@ const Crafting: React.FC<CraftingProps> = ({ onClose }) => {
             matches = false;
             break;
           }
+          
+          if (requiredType) {
+            ingredientCounts.set(requiredType, (ingredientCounts.get(requiredType) || 0) + (craftingCounts[i] || 0));
+          }
+        }
+        
+        if (matches) {
+          for (const ingredient of recipe.ingredients) {
+            const availableCount = ingredientCounts.get(ingredient.type) || 0;
+            if (availableCount < ingredient.count) {
+              matches = false;
+              break;
+            }
+          }
         }
         
         if (matches) return recipe;
@@ -57,18 +72,47 @@ const Crafting: React.FC<CraftingProps> = ({ onClose }) => {
   }, [craftingGrid, craftingCounts]);
 
   const handleCraftingSlotClick = (slotIndex: number) => {
-    // TODO: Handle crafting grid interactions
-    console.log('Clicked crafting slot:', slotIndex);
+    const selectedBlockType = inventory[selectedSlot];
+    if (selectedBlockType && inventoryCounts[selectedSlot] > 0) {
+      const newGrid = [...craftingGrid];
+      const newCounts = [...craftingCounts];
+      
+      if (newGrid[slotIndex] === selectedBlockType) {
+        newCounts[slotIndex]++;
+      } else {
+        newGrid[slotIndex] = selectedBlockType;
+        newCounts[slotIndex] = 1;
+      }
+      
+      removeFromInventory(selectedSlot, 1);
+      setCraftingGrid(newGrid);
+      setCraftingCounts(newCounts);
+    }
   };
 
   const handleCraftButtonClick = () => {
     if (craftResult) {
-      console.log('Crafting:', craftResult);
+      const recipe = findMatchingRecipe();
+      if (!recipe) return;
+      
+      recipe.ingredients.forEach(ingredient => {
+        for (let i = 0; i < 4; i++) {
+          if (craftingGrid[i] === ingredient.type && craftingCounts[i] >= ingredient.count) {
+            const newCounts = [...craftingCounts];
+            newCounts[i] -= ingredient.count;
+            if (newCounts[i] <= 0) {
+              const newGrid = [...craftingGrid];
+              newGrid[i] = null;
+              newCounts[i] = 0;
+              setCraftingGrid(newGrid);
+            }
+            setCraftingCounts(newCounts);
+            break;
+          }
+        }
+      });
       
       addToInventory(craftResult.type, craftResult.count);
-      
-      setCraftingGrid(new Array(4).fill(null));
-      setCraftingCounts(new Array(4).fill(0));
     }
   };
 

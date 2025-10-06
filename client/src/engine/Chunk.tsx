@@ -18,8 +18,11 @@ const Chunk: React.FC<ChunkProps> = ({ chunkX, chunkZ, position, size }) => {
   const sandTexture = useTexture('/textures/sand.jpg');
   const skyTexture = useTexture('/textures/sky.png');
 
-  const { getChunk } = useGame();
-  const voxelData = getChunk(chunkX, chunkZ);
+  const chunks = useGame(state => state.chunks);
+  const chunkKey = `${chunkX},${chunkZ}`;
+  const chunkData = chunks.get(chunkKey);
+  const voxelData = chunkData?.voxelData;
+  const isDirty = chunkData?.dirty || false;
 
   [grassTexture, asphaltTexture, woodTexture, sandTexture, skyTexture].forEach(texture => {
     texture.magFilter = THREE.NearestFilter;
@@ -43,8 +46,12 @@ const Chunk: React.FC<ChunkProps> = ({ chunkX, chunkZ, position, size }) => {
       new THREE.MeshLambertMaterial({ map: skyTexture, transparent: true, opacity: 0.8 }),
     ];
 
+    if (chunkData && isDirty) {
+      chunkData.dirty = false;
+    }
+
     return { geometry: geo, materials: mats };
-  }, [voxelData, size, grassTexture, asphaltTexture, woodTexture, sandTexture, skyTexture]);
+  }, [chunks, chunkX, chunkZ, size, grassTexture, asphaltTexture, woodTexture, sandTexture, skyTexture]);
 
   if (!geometry.attributes.position) {
     return null;
