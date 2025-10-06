@@ -12,41 +12,36 @@ interface ChunkData {
 
 interface GameState {
   phase: GamePhase;
-  
   // Player state
   playerPosition: THREE.Vector3;
   playerRotation: { x: number; y: number };
-  
   // Inventory
   inventory: (BlockType | null)[];
   inventoryCounts: number[];
   selectedSlot: number;
-  
   // World
   chunks: Map<string, ChunkData>;
   gameTime: number;
-  
+  // FPS
+  fps: number;
+  setFps: (v: number) => void;
   // Actions
   start: () => void;
   restart: () => void;
   end: () => void;
-  
   // Player actions
   setPlayerPosition: (position: THREE.Vector3) => void;
   setPlayerRotation: (rotation: { x: number; y: number }) => void;
-  
   // Inventory actions
   setSelectedSlot: (slot: number) => void;
   addToInventory: (blockType: BlockType, count?: number) => void;
   removeFromInventory: (slot: number, count?: number) => void;
-  
   // World actions
   setBlock: (x: number, y: number, z: number, blockType: BlockType) => void;
   getBlock: (x: number, y: number, z: number) => BlockType;
   setChunk: (chunkX: number, chunkZ: number, voxelData: Uint8Array) => void;
   getChunk: (chunkX: number, chunkZ: number) => Uint8Array | null;
   markChunkDirty: (chunkX: number, chunkZ: number) => void;
-  
   // Time
   updateGameTime: (delta: number) => void;
 }
@@ -92,7 +87,7 @@ export const useGame = create<GameState>()(
       });
     }
     
-    return {
+  return {
       phase: "ready",
       
       // Initial player state
@@ -110,7 +105,9 @@ export const useGame = create<GameState>()(
       chunks: initialChunks,
       gameTime: savedGame?.gameTime || 0,
       
-      start: () => {
+  fps: 0,
+  setFps: (v: number) => set({ fps: v }),
+  start: () => {
       set((state) => {
         if (state.phase === "ready") {
           return { phase: "playing" };
@@ -268,3 +265,4 @@ export const useGame = create<GameState>()(
     },
   };})
 );
+

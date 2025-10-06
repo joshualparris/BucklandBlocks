@@ -8,9 +8,10 @@ import { BlockType, getBlockDrops, isBlockSolid } from './blocks';
 import { useGame } from '../lib/stores/useGame';
 
 const PLAYER_HEIGHT = 1.8;
-const PLAYER_SPEED = 5;
-const JUMP_FORCE = 8;
-const GRAVITY = -20;
+const PLAYER_SPEED = 6;      // Slightly faster movement
+const JUMP_FORCE = 10;      // Higher jumps
+const GRAVITY = -25;        // Faster falling
+const AIR_CONTROL = 0.3;    // Some control while in air
 
 const Player: React.FC = () => {
   const { camera } = useThree();
@@ -90,10 +91,15 @@ const Player: React.FC = () => {
     if (keys.leftward) direction.sub(right);
 
     direction.normalize();
-    direction.multiplyScalar(PLAYER_SPEED);
-
-    velocity.x = direction.x;
-    velocity.z = direction.z;
+    
+    // Apply movement based on ground state
+    const speed = PLAYER_SPEED * (keys.sneak ? 0.5 : 1.0);
+    const control = onGroundRef.current ? 1.0 : AIR_CONTROL;
+    
+    // Smooth acceleration
+    const targetVelocity = direction.multiplyScalar(speed);
+    velocity.x = THREE.MathUtils.lerp(velocity.x, targetVelocity.x, control);
+    velocity.z = THREE.MathUtils.lerp(velocity.z, targetVelocity.z, control);
 
     if (keys.jump && onGroundRef.current) {
       velocity.y = JUMP_FORCE;

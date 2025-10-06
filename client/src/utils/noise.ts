@@ -34,30 +34,46 @@ export function generateChunkTerrain(
   const voxelData = new Uint8Array(sizeX * sizeY * sizeZ);
   
   const baseHeight = 64;
-  const heightVariation = 8;
-
+  const heightVariation = 16;
+  const hilliness = 0.02; // Controls how hilly the terrain is
+  
   for (let x = 0; x < sizeX; x++) {
     for (let z = 0; z < sizeZ; z++) {
       const worldX = chunkX + x;
       const worldZ = chunkZ + z;
       
-      // Generate height using noise
-      const heightNoise = octaveNoise(worldX * 0.01, worldZ * 0.01);
-      const terrainHeight = baseHeight + Math.floor(heightNoise * heightVariation);
+      // Combine different noise frequencies for more natural terrain
+      // Cache octave noise values for this (x, z) column
+      const octaveNoiseLarge = octaveNoise(worldX * hilliness * 0.5, worldZ * hilliness * 0.5, 4);
+      const octaveNoiseSmall = octaveNoise(worldX * hilliness * 2, worldZ * hilliness * 2, 2);
+      const combinedNoise = octaveNoiseLarge * 0.7 + octaveNoiseSmall * 0.3;
+      
+      const terrainHeight = baseHeight + Math.floor(combinedNoise * heightVariation);
       
       for (let y = 0; y < sizeY; y++) {
         const worldY = chunkY + y;
         const voxelIndex = x + y * sizeX + z * sizeX * sizeY;
         
-        if (worldY < terrainHeight - 3) {
+        if (worldY < terrainHeight - 4) {
           // Deep underground - stone
           voxelData[voxelIndex] = BlockType.STONE;
         } else if (worldY < terrainHeight - 1) {
           // Shallow underground - dirt
           voxelData[voxelIndex] = BlockType.DIRT;
         } else if (worldY === terrainHeight - 1) {
-          // Surface - grass
-          voxelData[voxelIndex] = BlockType.GRASS;
+          // Surface layer - mix of blocks based on height and noise
+          const surfaceNoise = noise(worldX * 0.1, worldZ * 0.1);
+          
+          if (terrainHeight > baseHeight + 8) {
+            // Higher elevations - stone and dirt mix
+            voxelData[voxelIndex] = surfaceNoise > 0.6 ? BlockType.STONE : BlockType.DIRT;
+          } else if (terrainHeight < baseHeight - 4) {
+            // Lower elevations - sand
+            voxelData[voxelIndex] = BlockType.SAND;
+          } else {
+            // Normal elevation - grass
+            voxelData[voxelIndex] = BlockType.GRASS;
+          }
         } else {
           // Air
           voxelData[voxelIndex] = BlockType.AIR;

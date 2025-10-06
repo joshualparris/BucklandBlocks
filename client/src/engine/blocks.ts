@@ -14,6 +14,8 @@ export enum BlockType {
   COBBLESTONE = 12,
   DOOR_BOTTOM = 13,
   DOOR_TOP = 14,
+  WOOD,
+  SKY,
 }
 
 export interface BlockData {
@@ -194,6 +196,28 @@ export const BLOCKS: Record<BlockType, BlockData> = {
     solid: true,
     drops: [],
   },
+  [BlockType.WOOD]: {
+    id: BlockType.WOOD,
+    name: "Wood",
+    texture: "/textures/wood.jpg",
+    hardness: 2,
+    transparent: false,
+    emissive: false,
+    liquid: false,
+    solid: true,
+    drops: [{ id: BlockType.WOOD, count: 1 }],
+  },
+  [BlockType.SKY]: {
+    id: BlockType.SKY,
+    name: "Sky",
+    texture: "/textures/sky.png",
+    hardness: 0,
+    transparent: true,
+    emissive: false,
+    liquid: false,
+    solid: false,
+    drops: [],
+  }
 };
 
 export function getBlockData(blockType: BlockType): BlockData {

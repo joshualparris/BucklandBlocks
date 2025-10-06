@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useState } from "react";
+import * as THREE from "three";
 import { KeyboardControls } from "@react-three/drei";
 import { useGame } from "./lib/stores/useGame";
 import World from "./engine/World";
@@ -9,6 +10,7 @@ import GameHUD from "./ui/GameHUD";
 import Inventory from "./ui/Inventory";
 import Crafting from "./ui/Crafting";
 import PauseMenu from "./ui/PauseMenu";
+import HooksBridge from "@/renderer/HooksBridge";
 import "@fontsource/inter";
 
 // Define control keys for the game
@@ -85,26 +87,34 @@ function App() {
         <KeyboardControls map={controls}>
           <Canvas
             shadows
+            dpr={[1, 2]} // Adapt to device pixel ratio
             camera={{
               position: [0, 70, 0],
-              fov: 75,
+              fov: 70,  // Slightly narrower FOV for less distortion
               near: 0.1,
               far: 1000
             }}
             gl={{
               antialias: true,
-              powerPreference: "high-performance"
+              stencil: false,  // Don't need stencil buffer
+              depth: true,     // Need depth buffer for 3D
+              powerPreference: "high-performance",
+              alpha: false     // No need for transparency in main canvas
+            }}
+            onCreated={({ gl }) => {
+              gl.shadowMap.enabled = true;
+              gl.shadowMap.type = THREE.PCFSoftShadowMap;
             }}
           >
             <Suspense fallback={null}>
               <DayNightCycle />
               <World />
               <Player />
+              <HooksBridge />
             </Suspense>
           </Canvas>
           
           <GameHUD />
-          
           {showInventory && <Inventory onClose={() => setShowInventory(false)} />}
           {showCrafting && <Crafting onClose={() => setShowCrafting(false)} />}
           {showPause && <PauseMenu onClose={() => setShowPause(false)} />}

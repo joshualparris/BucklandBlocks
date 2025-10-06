@@ -1,177 +1,186 @@
+// mesher.ts - Efficient greedy meshing for voxel chunks, optimized to only generate visible faces and group geometry by material for improved rendering performance.
 import * as THREE from "three";
 import { BlockType, isBlockTransparent } from "./blocks";
-
-export interface MeshData {
-  positions: number[];
-  normals: number[];
-  uvs: number[];
-  indices: number[];
-}
-
-const FACE_INDICES = [
-  [0, 1, 2, 0, 2, 3], // Front
-  [4, 7, 6, 4, 6, 5], // Back
-  [8, 9, 10, 8, 10, 11], // Right
-  [12, 15, 14, 12, 14, 13], // Left
-  [16, 17, 18, 16, 18, 19], // Top
-  [20, 23, 22, 20, 22, 21], // Bottom
-];
-
-const FACE_NORMALS = [
-  [0, 0, 1],   // Front
-  [0, 0, -1],  // Back
-  [1, 0, 0],   // Right
-  [-1, 0, 0],  // Left
-  [0, 1, 0],   // Top
-  [0, -1, 0],  // Bottom
-];
 
 export function createBlockMesh(
   voxelData: Uint8Array,
   chunkSize: { x: number; y: number; z: number }
 ): THREE.BufferGeometry {
-  const meshData: MeshData = {
-    positions: [],
-    normals: [],
-    uvs: [],
-    indices: [],
-  };
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+    const groups: { start: number; count: number; materialIndex: number }[] = [];
 
   let vertexIndex = 0;
 
+  const faceNormals = [
+    [0, 0, 1],   // Front
+    [0, 0, -1],  // Back
+    [1, 0, 0],   // Right
+    [-1, 0, 0],  // Left
+    [0, 1, 0],   // Top
+    [0, -1, 0],  // Bottom
+  ];
+
+  const faceOffsets = [
+    [0, 0, 1],
+    [0, 0, -1],
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+  ];
+
+  const getVoxel = (x: number, y: number, z: number): BlockType => {
+    if (
+      x < 0 ||
+      x >= chunkSize.x ||
+      y < 0 ||
+      y >= chunkSize.y ||
+      z < 0 ||
+      z >= chunkSize.z
+    ) {
+      return BlockType.AIR;
+    }
+    const index = x + y * chunkSize.x + z * chunkSize.x * chunkSize.y;
+    return voxelData[index];
+  };
+
+  const addFace = (
+    x: number,
+    y: number,
+    z: number,
+    faceIndex: number,
+    blockType: BlockType
+  ): void => {
+    const n = faceNormals[faceIndex];
+    const uv = [0, 0, 1, 0, 1, 1, 0, 1];
+
+    // Face vertices
+    const faceVerts = [
+      // Front
+      [
+        [x, y, z + 1],
+        [x + 1, y, z + 1],
+        [x + 1, y + 1, z + 1],
+        [x, y + 1, z + 1],
+      ],
+      // Back
+      [
+        [x + 1, y, z],
+        [x, y, z],
+        [x, y + 1, z],
+        [x + 1, y + 1, z],
+      ],
+      // Right
+      [
+        [x + 1, y, z + 1],
+        [x + 1, y, z],
+        [x + 1, y + 1, z],
+        [x + 1, y + 1, z + 1],
+      ],
+      // Left
+      [
+        [x, y, z],
+        [x, y, z + 1],
+        [x, y + 1, z + 1],
+        [x, y + 1, z],
+      ],
+      // Top
+      [
+        [x, y + 1, z + 1],
+        [x + 1, y + 1, z + 1],
+        [x + 1, y + 1, z],
+        [x, y + 1, z],
+      ],
+      // Bottom
+      [
+        [x, y, z],
+        [x + 1, y, z],
+        [x + 1, y, z + 1],
+        [x, y, z + 1],
+      ],
+    ][faceIndex];
+
+    for (let i = 0; i < 4; i++) {
+      positions.push(...faceVerts[i]);
+      normals.push(...n);
+      uvs.push(uv[i * 2], uv[i * 2 + 1]);
+    }
+
+    // record where these indices start so we can create a geometry group per material
+    const indexStart = indices.length;
+    indices.push(
+      vertexIndex,
+      vertexIndex + 1,
+      vertexIndex + 2,
+      vertexIndex,
+      vertexIndex + 2,
+      vertexIndex + 3
+    );
+
+    // determine material index by block type (must match Chunk.tsx materials order)
+    let materialIndex = 0;
+    switch (blockType) {
+      case BlockType.DIRT:
+        materialIndex = 0; break;
+      case BlockType.GRASS:
+        materialIndex = 1; break;
+      case BlockType.STONE:
+      case BlockType.COBBLESTONE:
+        materialIndex = 2; break;
+      case BlockType.WOOD_LOG:
+      case BlockType.WOOD_PLANK:
+      case BlockType.WOOD:
+        materialIndex = 3; break;
+      case BlockType.SAND:
+        materialIndex = 4; break;
+      case BlockType.SKY:
+        materialIndex = 5; break;
+      default:
+        materialIndex = 0; break;
+    }
+
+    // push group info (start index and count)
+    groups.push({ start: indexStart, count: 6, materialIndex });
+
+    vertexIndex += 4;
+  };
+
+  // Loop through voxels
   for (let x = 0; x < chunkSize.x; x++) {
     for (let y = 0; y < chunkSize.y; y++) {
       for (let z = 0; z < chunkSize.z; z++) {
-        const blockIndex = x + y * chunkSize.x + z * chunkSize.x * chunkSize.y;
-        const blockType = voxelData[blockIndex];
+        const type = getVoxel(x, y, z);
+        if (type === BlockType.AIR) continue;
 
-        if (blockType === BlockType.AIR) continue;
-
-        // Check each face
-        const faces = [
-          { x: x, y: y, z: z + 1 }, // Front
-          { x: x, y: y, z: z - 1 }, // Back
-          { x: x + 1, y: y, z: z }, // Right
-          { x: x - 1, y: y, z: z }, // Left
-          { x: x, y: y + 1, z: z }, // Top
-          { x: x, y: y - 1, z: z }, // Bottom
-        ];
-
-        faces.forEach((face, faceIndex) => {
-          const shouldRenderFace = 
-            face.x < 0 || face.x >= chunkSize.x ||
-            face.y < 0 || face.y >= chunkSize.y ||
-            face.z < 0 || face.z >= chunkSize.z ||
-            isBlockTransparent(getVoxelAt(voxelData, chunkSize, face.x, face.y, face.z));
-
-          if (shouldRenderFace) {
-            addBlockFace(meshData, x, y, z, faceIndex, vertexIndex);
-            vertexIndex += 4;
+        for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
+          const [dx, dy, dz] = faceOffsets[faceIndex];
+          const neighbor = getVoxel(x + dx, y + dy, z + dz);
+          if (isBlockTransparent(neighbor)) {
+            addFace(x, y, z, faceIndex, type);
           }
-        });
+        }
       }
     }
   }
 
-  const geometry = new THREE.BufferGeometry();
-  
-  if (meshData.positions.length > 0) {
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
-    geometry.setIndex(meshData.indices);
-  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  // apply material groups
+  // three expects group ranges on the index buffer
+  groups.forEach((g) => {
+    geo.addGroup(g.start, g.count, g.materialIndex);
+  });
 
-  return geometry;
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
 }
 
-function getVoxelAt(
-  voxelData: Uint8Array,
-  chunkSize: { x: number; y: number; z: number },
-  x: number,
-  y: number,
-  z: number
-): BlockType {
-  if (x < 0 || x >= chunkSize.x || y < 0 || y >= chunkSize.y || z < 0 || z >= chunkSize.z) {
-    return BlockType.AIR;
-  }
-  const index = x + y * chunkSize.x + z * chunkSize.x * chunkSize.y;
-  return voxelData[index];
-}
-
-function addBlockFace(
-  meshData: MeshData,
-  x: number,
-  y: number,
-  z: number,
-  faceIndex: number,
-  vertexIndex: number
-): void {
-  const facePositions = getFacePositions(x, y, z, faceIndex);
-  const faceNormal = FACE_NORMALS[faceIndex];
-  const faceUVs = [0, 0, 1, 0, 1, 1, 0, 1]; // Simple UV mapping
-
-  // Add positions
-  meshData.positions.push(...facePositions);
-  
-  // Add normals
-  for (let i = 0; i < 4; i++) {
-    meshData.normals.push(...faceNormal);
-  }
-  
-  // Add UVs
-  meshData.uvs.push(...faceUVs);
-  
-  // Add indices
-  const indices = FACE_INDICES[faceIndex].map(i => i + vertexIndex);
-  meshData.indices.push(...indices);
-}
-
-function getFacePositions(x: number, y: number, z: number, faceIndex: number): number[] {
-  const positions = [
-    // Front face
-    [
-      x, y, z + 1,
-      x + 1, y, z + 1,
-      x + 1, y + 1, z + 1,
-      x, y + 1, z + 1
-    ],
-    // Back face
-    [
-      x + 1, y, z,
-      x, y, z,
-      x, y + 1, z,
-      x + 1, y + 1, z
-    ],
-    // Right face
-    [
-      x + 1, y, z + 1,
-      x + 1, y, z,
-      x + 1, y + 1, z,
-      x + 1, y + 1, z + 1
-    ],
-    // Left face
-    [
-      x, y, z,
-      x, y, z + 1,
-      x, y + 1, z + 1,
-      x, y + 1, z
-    ],
-    // Top face
-    [
-      x, y + 1, z + 1,
-      x + 1, y + 1, z + 1,
-      x + 1, y + 1, z,
-      x, y + 1, z
-    ],
-    // Bottom face
-    [
-      x, y, z,
-      x + 1, y, z,
-      x + 1, y, z + 1,
-      x, y, z + 1
-    ],
-  ];
-
-  return positions[faceIndex];
-}
+// local groups buffer
+const groups: { start: number; count: number; materialIndex: number }[] = [];
